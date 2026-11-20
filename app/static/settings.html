@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcoder Settings</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>⚙️ Settings</h1><div class="muted">Saved to the <code>/data</code> volume, applied instantly.</div></div>
+    <div class="small"><a href="/">← Back to app</a></div>
+  </header>
+
+  <form id="form">
+    <div class="card">
+      <h2>Domain &amp; site</h2>
+      <div class="grid">
+        <div>
+          <label for="public_url">Public URL / domain</label>
+          <input type="text" id="public_url" placeholder="https://video.example.com">
+          <div class="muted small">Used for download links &amp; API examples. Leave empty to auto-detect from each request.</div>
+        </div>
+        <div>
+          <label for="site_title">Site title</label>
+          <input type="text" id="site_title">
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" id="enforce_domain"> Only answer requests for this domain</label>
+          <div class="muted small">Other Host headers get HTTP 421 (/health and localhost always allowed).</div>
+        </div>
+        <div>
+          <label for="cors_origins">CORS allowed origins</label>
+          <input type="text" id="cors_origins" placeholder="https://app.example.com, https://other.com  (or *)">
+          <div class="muted small">Comma-separated; lets other sites call the API from a browser.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Access &amp; limits</h2>
+      <div class="grid">
+        <div>
+          <label for="api_key">API key</label>
+          <div class="row" style="flex-wrap:nowrap">
+            <input type="text" id="api_key" placeholder="(none — open to everyone)" autocomplete="off">
+            <button type="button" class="secondary" id="genKey">Generate</button>
+          </div>
+          <div class="muted small">If set, uploads need the <code>X-API-Key</code> header (the web UI asks for it).</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" id="allow_user_options"> Let users change processing options</label>
+          <div class="muted small">If off, every job uses the defaults below.</div>
+        </div>
+        <div><label for="max_upload_mb">Max upload (MB)</label><input type="number" id="max_upload_mb" min="1"></div>
+        <div><label for="ffmpeg_timeout">Job timeout (seconds)</label><input type="number" id="ffmpeg_timeout" min="10"></div>
+        <div><label for="max_concurrent_jobs">Parallel jobs</label><input type="number" id="max_concurrent_jobs" min="1"></div>
+        <div><label for="retention_minutes">Keep finished files (minutes)</label><input type="number" id="retention_minutes" min="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Default processing options</h2>
+      <div id="opts"></div>
+    </div>
+
+    <div class="row" style="margin-bottom:16px">
+      <button id="save">Save settings</button>
+      <span id="status" class="small"></span>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Jobs</h2><button type="button" class="secondary" id="refresh">Refresh</button></div>
+    <div id="jobs" style="margin-top:10px"></div>
+  </div>
+</main>
+<script src="/static/options.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const TEXT = ["public_url", "site_title", "cors_origins", "api_key"];
+const NUM = ["max_upload_mb", "ffmpeg_timeout", "max_concurrent_jobs", "retention_minutes"];
+const BOOL = ["enforce_domain", "allow_user_options"];
+const esc = s => String(s ?? "").replace(/[<>&"]/g, c => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;" }[c]));
+
+async function load() {
+  const r = await fetch("/api/admin/settings", { credentials: "same-origin" });
+  if (!r.ok) { $("status").innerHTML = `<span class="err">Failed to load (${r.status})</span>`; return; }
+  const { settings: s, choices, jobs } = await r.json();
+  TEXT.forEach(k => $(k).value = s[k] ?? "");
+  NUM.forEach(k => $(k).value = s[k]);
+  BOOL.forEach(k => $(k).checked = !!s[k]);
+  renderOptions($("opts"), s.job_defaults, choices);
+  renderJobs(jobs);
+}
+
+function renderJobs(jobs) {
+  if (!jobs.length) { $("jobs").innerHTML = "<p class='muted small'>No jobs right now.</p>"; return; }
+  $("jobs").innerHTML = `<table><tr><th>Created</th><th>Status</th><th>Mode</th><th></th></tr>${jobs.map(j => `
+    <tr><td>${new Date(j.created*1000).toLocaleString()}</td>
+    <td class="${j.status === "error" ? "err" : j.status === "done" ? "ok" : ""}">${esc(j.status)} ${j.status === "processing" ? j.progress + "%" : ""}${j.error ? "<br><span class='small'>" + esc(j.error).slice(0, 200) + "</span>" : ""}</td>
+    <td>${esc(j.options.mode)}</td>
+    <td><button type="button" class="secondary" data-del="${esc(j.id)}">Delete</button></td></tr>`).join("")}</table>`;
+  $("jobs").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    await fetch(`/api/admin/jobs/${b.dataset.del}`, { method: "DELETE", credentials: "same-origin" });
+    load();
+  });
+}
+
+$("genKey").onclick = () => {
+  const a = new Uint8Array(24); crypto.getRandomValues(a);
+  $("api_key").value = btoa(String.fromCharCode(...a)).replace(/[+/=]/g, "");
+};
+$("refresh").onclick = load;
+
+$("form").onsubmit = async e => {
+  e.preventDefault();
+  const body = { job_defaults: readOptions($("opts")) };
+  TEXT.forEach(k => body[k] = $(k).value);
+  NUM.forEach(k => body[k] = Number($(k).value));
+  BOOL.forEach(k => body[k] = $(k).checked);
+  $("save").disabled = true;
+  try {
+    const r = await fetch("/api/admin/settings", { method: "PUT", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    $("status").innerHTML = `<span class="ok">✅ Saved</span>`;
+    $("public_url").value = j.settings.public_url;
+  } catch (err) { $("status").innerHTML = `<span class="err">❌ ${esc(err.message)}</span>`; }
+  finally { $("save").disabled = false; setTimeout(() => $("status").textContent = "", 4000); }
+};
+
+load();
+</script>
+</body>
+</html>

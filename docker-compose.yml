@@ -1,0 +1,15 @@
+# Optional: for Coolify "Docker Compose" build pack or local use.
+services:
+  cheezytranscoder:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      - API_KEY=${API_KEY:-}
+    volumes:
+      - cheezy-data:/data
+    restart: unless-stopped
+volumes:
+  cheezy-data:
