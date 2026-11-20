@@ -1,15 +1,23 @@
-# Optional: for Coolify "Docker Compose" build pack or local use.
+# Works with Coolify's "Docker Compose" build pack (Coolify's proxy routes to
+# the exposed port; no host port is published, so nothing can clash).
+# For local use: docker compose -f docker-compose.yml -f docker-compose.local.yml up
 services:
   cheezytranscoder:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - PUBLIC_URL=${PUBLIC_URL:-}
       - API_KEY=${API_KEY:-}
     volumes:
       - cheezy-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 volumes:
   cheezy-data:

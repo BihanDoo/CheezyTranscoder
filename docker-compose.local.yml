@@ -1,0 +1,5 @@
+# Local-only override: publish the app on http://localhost:8000
+services:
+  cheezytranscoder:
+    ports:
+      - "8000:8000"

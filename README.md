@@ -15,7 +15,7 @@ It uses ffmpeg and FastAPI, ships as a single Dockerfile, and is made for [Cooli
 
 ## Deploy on Coolify
 1. **+ New Resource → Public/Private Repository** and pick this repo.
-2. Build Pack: **Dockerfile**. Ports Exposes: **8000**.
+2. Build Pack: **Dockerfile** (Ports Exposes: **8000**) or **Docker Compose** (uses `docker-compose.yml`, which creates the `/data` volume for you).
 3. **Domains**: set your domain (e.g. `https://video.example.com`). The app picks it up automatically from `COOLIFY_URL`. You can also override it in `/settings`.
 4. **Persistent Storage**: add a volume mounted at **`/data`** so settings survive redeploys.
 5. (Recommended) Add the env var `ADMIN_PASSWORD`. If you don't, a password is generated and printed in the deployment logs on first boot.
@@ -111,7 +111,7 @@ All are optional. Except `ADMIN_PASSWORD`, `DATA_DIR` and `PORT`, they only set 
 docker build -t cheezytranscoder .
 docker run -p 8000:8000 -v cheezy-data:/data -e ADMIN_PASSWORD=changeme cheezytranscoder
 ```
-Or use `docker compose up`.
+Or with compose: `docker compose -f docker-compose.yml -f docker-compose.local.yml up`.
 
 ## Notes
 - Job state is kept in memory, so run a single replica. Jobs in progress are lost on restart.
