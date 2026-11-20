@@ -62,6 +62,27 @@ DEFAULT_JOB_OPTIONS: dict[str, Any] = {
     "audio_codec": "aac",        # aac | libopus | libmp3lame | flac | copy | none
     "audio_bitrate": "192k",
     "audio_channels": 0,         # 0 = keep
+    # --- custom metadata written AFTER stripping (empty = don't write) ---
+    "meta_title": "",
+    "meta_artist": "",
+    "meta_comment": "",
+    "meta_description": "",
+    "meta_copyright": "",
+    "meta_genre": "",
+    "meta_date": "",             # ISO 8601, e.g. 2023-07-04T12:30:00Z
+    "meta_lat": "",              # decimal degrees
+    "meta_lon": "",
+    "meta_alt": "",              # metres (optional)
+    "meta_make": "",
+    "meta_model": "",
+    "meta_software": "",
+    "meta_custom": "",           # extra "key=value" lines
+    "meta_apple_keys": True,     # also write com.apple.quicktime.* keys (MP4/MOV)
+    "meta_android_keys": False,  # also write com.android.manufacturer/model/version
+    # --- keep selected original values instead of stripping them ---
+    "keep_date": False,
+    "keep_location": False,
+    "keep_device": False,
 }
 
 

@@ -108,6 +108,7 @@ async def process(job: Job, src: Path) -> None:
             ext = ffmpeg.output_ext(src.suffix.lower(), o)
             dst = job.dir / f"output{ext}"
             job.before = await ffmpeg.probe_metadata(src)
+            o = ffmpeg.apply_kept(o, job.before)
             duration = await ffmpeg.probe_duration(src)
 
             def prog(p: float) -> None:

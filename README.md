@@ -10,6 +10,8 @@ It uses ffmpeg and FastAPI, ships as a single Dockerfile, and is made for [Cooli
 - **Admin settings UI** at `/settings`: public domain, site title, API key, CORS, limits, retention and default job options. Saved to `/data` and applied instantly with no restart.
 - **Configurable domain**: used for download/share links and API examples, with optional strict Host enforcement
 - **REST API**: synchronous `/strip`, or async jobs with progress. Interactive docs at `/api/docs`.
+- **Custom metadata**: write your own location (type it, use your current location, or pick on a built-in map), date, camera/phone make and model, title, copyright and any extra tags. Or keep just the original date, location or device.
+- **Device presets**: iPhone 17 Pro Max, Galaxy S25 Ultra, Pixel 10 Pro and more, each tagged the way that device writes it
 - Optional output filename randomization so the original filename doesn't leak
 - Files are auto-deleted after a configurable retention time
 
@@ -35,6 +37,31 @@ It uses ffmpeg and FastAPI, ships as a single Dockerfile, and is made for [Cooli
 | Bitstream encoder info | x264/x265 SEI blocks holding the full encoder version & settings | `filter_units` / `info=0` |
 
 Container-structural fields (`major_brand`, `handler_name=VideoHandler`, `language=und`) are generic defaults written by the muxer, not data from your file.
+
+## Custom metadata
+After stripping, you can write new metadata. Every field is optional; empty means not written.
+
+| Field | Example | Written as |
+|---|---|---|
+| `meta_make` / `meta_model` / `meta_software` | `Apple` / `iPhone 17 Pro Max` / `26.1` | `make`, `model`, `software` (+ Apple or Android keys, see below) |
+| `meta_date` | `2026-10-31T18:45:00Z` (ISO 8601; offsets OK) | `creation_time` (container + tracks), `date`, `com.apple.quicktime.creationdate` |
+| `meta_lat` / `meta_lon` / `meta_alt` | `40.758` / `-73.9855` / `12` | ISO 6709 `location` (©xyz) + `com.apple.quicktime.location.ISO6709` |
+| `meta_title`, `meta_artist`, `meta_comment`, `meta_description`, `meta_copyright`, `meta_genre` | | standard tags (+ `com.apple.quicktime.*`) |
+| `meta_custom` | `album=Trip` (one `key=value` per line) | as given |
+| `meta_apple_keys` | `true` (default) | also write `com.apple.quicktime.*` keys (iPhone style). Photos apps read date and location from these. |
+| `meta_android_keys` | `false` (default) | also write `com.android.manufacturer` / `model` / `version` (Pixel/Samsung style) |
+| `keep_date`, `keep_location`, `keep_device` | `false` | keep that original value, still stripping everything else |
+
+**Device presets** live in [`app/static/devices.js`](app/static/devices.js). Add models there. Samsung phones report model codes, e.g. Galaxy S25 Ultra = `SM-S938B`. Make/model tags survive in MP4/MOV only when Apple or Android keys are on (MKV keeps them either way).
+
+```bash
+# Tag a clip as shot on an iPhone 17 Pro Max in Times Square
+curl -X POST https://video.example.com/strip -F "file=@clip.mp4" \
+  -F meta_make=Apple -F "meta_model=iPhone 17 Pro Max" -F meta_software=26.1 \
+  -F meta_lat=40.758 -F meta_lon=-73.9855 -F meta_date=2026-10-31T18:45:00Z -OJ
+```
+
+The map picker uses a bundled copy of Leaflet (no CDN) and loads OpenStreetMap tiles only when you open it.
 
 ## API
 ```bash
